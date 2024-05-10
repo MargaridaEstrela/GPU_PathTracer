@@ -24,23 +24,20 @@ bool hit_world(Ray r, float tmin, float tmax, out HitRecord rec)
         rec.material = createDiffuseMaterial(vec3(0.2));
     }
 
-    if (hit_sphere(
-            createSphere(vec3(-4.0, 1.0, 0.0), 1.0), r, tmin, rec.t, rec))
+    if (hit_sphere(createSphere(vec3(-4.0, 1.0, 0.0), 1.0), r, tmin, rec.t, rec))
     {
         hit = true;
         rec.material = createDiffuseMaterial(vec3(0.2, 0.95, 0.1));
         //rec.material = createDiffuseMaterial(vec3(0.4, 0.2, 0.1));
     }
 
-    if (hit_sphere(
-            createSphere(vec3(4.0, 1.0, 0.0), 1.0), r, tmin, rec.t, rec))
+    if (hit_sphere(createSphere(vec3(4.0, 1.0, 0.0), 1.0), r, tmin, rec.t, rec))
     {
         hit = true;
         rec.material = createMetalMaterial(vec3(0.7, 0.6, 0.5), 0.0);
     }
 
-    if (hit_sphere(
-            createSphere(vec3(0.0, 1.0, 0.0), 1.0), r, tmin, rec.t, rec))
+    if (hit_sphere(createSphere(vec3(0.0, 1.0, 0.0), 1.0), r, tmin, rec.t, rec))
     {
         hit = true;
         rec.material = createDialectricMaterial(vec3(0.0), 1.333, 0.0);
@@ -123,12 +120,38 @@ bool hit_world(Ray r, float tmin, float tmax, out HitRecord rec)
 }
 
 vec3 directlighting(pointLight pl, Ray r, HitRecord rec) {
-    vec3 diffCol, specCol;
+    vec3 diffCol = rec.material.albedo;
+    vec3 specCol = rec.material.specColor;
     vec3 colorOut = vec3(0.0, 0.0, 0.0);
-    float shininess;
+    float shininess;;
+    vec3 emissive = rec.material.emissive;
     HitRecord dummy;
 
     //INSERT YOUR CODE HERE
+    vec3 l = normalize(pl.pos - rec.pos); //light vector
+    float intensity = max(dot(rec.normal, l), 0.0);
+    float dist = length(pl.pos - rec.pos);
+
+    Ray shadowRay = createRay(rec.pos + rec.normal * epsilon, l);
+
+    if (intensity > 0.0) {
+        if (!hit_world(shadowRay, 0.0, dist, dummy))
+        {
+            if(rec.material.type == MT_DIFFUSE) {
+                diffCol = diffCol / pi * intensity;
+                shininess = 4.0 / (pow(rec.material.roughness, 4.0) + epsilon) - 2.0;
+            }
+            else if(rec.material.type == MT_METAL) {
+                shininess = 8.0 / (pow(rec.material.roughness, 4.0) + epsilon) - 2.0;
+            }
+            else if(rec.material.type == MT_DIALECTRIC) {
+                shininess = 500.0;
+            }
+
+            vec3 h = normalize(l - r.d);
+            colorOut = pl.color * diffCol + pl.color * specCol * pow(max(dot(h, rec.normal), 0.0), shininess) + emissive;
+        }
+    }
 
     return colorOut;
 }
@@ -142,15 +165,15 @@ vec3 rayColor(Ray r)
     vec3 throughput = vec3(1.0f, 1.0f, 1.0f);
     for (int i = 0; i < MAX_BOUNCES; ++i)
     {
-        if (hit_world(r, 0.001, 10000.0, rec))
-        {
+        if (hit_world(r, epsilon, 10000.0, rec))
+        {   
+            // if outside
+            if (dot(r.d, rec.normal) < 0.0)
             //calculate direct lighting with 3 white point lights:
             {
-                //createPointLight(vec3(-10.0, 15.0, 0.0), vec3(1.0, 1.0, 1.0))
-                //createPointLight(vec3(8.0, 15.0, 3.0), vec3(1.0, 1.0, 1.0))
-                //createPointLight(vec3(1.0, 15.0, -9.0), vec3(1.0, 1.0, 1.0))
-
-                //for instance: col += directlighting(createPointLight(vec3(-10.0, 15.0, 0.0), vec3(1.0, 1.0, 1.0)), r, rec) * throughput;
+                col += directlighting(createPointLight(vec3(-10.0, 15.0, 0.0), vec3(1.0, 1.0, 1.0)), r, rec) * throughput;
+                col += directlighting(createPointLight(vec3(8.0, 15.0, 3.0), vec3(1.0, 1.0, 1.0)), r, rec) * throughput;
+                col += directlighting(createPointLight(vec3(1.0, 15.0, -9.0), vec3(1.0, 1.0, 1.0)), r, rec) * throughput;
             }
 
             //calculate secondary ray and update throughput
@@ -158,59 +181,65 @@ vec3 rayColor(Ray r)
             vec3 atten;
             if (scatter(r, rec, atten, scatterRay))
             { //  insert your code here    }
+                throughput *= atten;
+                r = scatterRay;
             }
-            else //background
+            else //it never happens. The material always scatters the incoming ray
             {
-                float t = 0.8 * (r.d.y + 1.0);
-                col += throughput * mix(vec3(1.0), vec3(0.5, 0.7, 1.0), t);
-                break;
+                return vec3(0.0);
             }
         }
-        return col;
+        else //background color varying with y direction of the ray
+        {
+            float t = 0.8 * (r.d.y + 1.0);
+            col += throughput * mix(vec3(1.0), vec3(0.5, 0.7, 1.0), t);
+            break;
+        }
     }
+    return col;
+}
 
-    #define MAX_SAMPLES 10000.0
+#define MAX_SAMPLES 10000.0
 
-    void main
-    ( )
+void main()
+{
+    gSeed = float(baseHash(floatBitsToUint(gl_FragCoord.xy))) / float(0xffffffffU) + iTime;
+
+    vec2 mouse = iMouse.xy / iResolution.xy;
+    mouse.x = mouse.x * 2.0 - 1.0;
+
+    vec3 camPos = vec3(mouse.x * 10.0, mouse.y * 5.0, 8.0);
+    vec3 camTarget = vec3(0.0, 0.0, -1.0);
+    float fovy = 60.0;
+    float aperture = 0.0;
+    float distToFocus = 1.0;
+    float time0 = 0.0;
+    float time1 = 1.0;
+    Camera cam = createCamera(camPos, camTarget, vec3(0.0, 1.0, 0.0), // world up vector
+            fovy, iResolution.x / iResolution.y, aperture, distToFocus,
+            time0, time1);
+
+    //usa-se o 4 canal de cor para guardar o numero de samples e não o iFrame pois quando se mexe o rato faz-se reset
+
+    vec4 prev = texture(iChannel0, gl_FragCoord.xy / iResolution.xy);
+    vec3 prevLinear = toLinear(prev.xyz);
+
+    vec2 ps = gl_FragCoord.xy + hash2(gSeed);
+    //vec2 ps = gl_FragCoord.xy;
+    vec3 color = rayColor(getRay(cam, ps));
+
+    if (iMouseButton.x != 0.0 || iMouseButton.y != 0.0)
     {
-        gSeed = float(baseHash(floatBitsToUint(gl_FragCoord.xy))) / float(0xffffffffU) + iTime;
-
-        vec2 mouse = iMouse.xy / iResolution.xy;
-        mouse.x = mouse.x * 2.0 - 1.0;
-
-        vec3 camPos = vec3(mouse.x * 10.0, mouse.y * 5.0, 8.0);
-        vec3 camTarget = vec3(0.0, 0.0, -1.0);
-        float fovy = 60.0;
-        float aperture = 0.0;
-        float distToFocus = 1.0;
-        float time0 = 0.0;
-        float time1 = 1.0;
-        Camera cam = createCamera(camPos, camTarget, vec3(0.0, 1.0, 0.0), // world up vector
-                fovy, iResolution.x / iResolution.y, aperture, distToFocus,
-                time0, time1);
-
-        //usa-se o 4 canal de cor para guardar o numero de samples e não o iFrame pois quando se mexe o rato faz-se reset
-
-        vec4 prev = texture(iChannel0, gl_FragCoord.xy / iResolution.xy);
-        vec3 prevLinear = toLinear(prev.xyz);
-
-        vec2 ps = gl_FragCoord.xy + hash2(gSeed);
-        //vec2 ps = gl_FragCoord.xy;
-        vec3 color = rayColor(getRay(cam, ps));
-
-        if (iMouseButton.x != 0.0 || iMouseButton.y != 0.0)
-        {
-            gl_FragColor = vec4(toGamma(color), 1.0); //samples number reset = 1
-            return;
-        }
-        if (prev.w > MAX_SAMPLES)
-        {
-            gl_FragColor = prev;
-            return;
-        }
-
-        float w = prev.w + 1.0;
-        color = mix(prevLinear, color, 1.0 / w);
-        gl_FragColor = vec4(toGamma(color), w);
+        gl_FragColor = vec4(toGamma(color), 1.0); //samples number reset = 1
+        return;
     }
+    if (prev.w > MAX_SAMPLES)
+    {
+        gl_FragColor = prev;
+        return;
+    }
+
+    float w = prev.w + 1.0;
+    color = mix(prevLinear, color, 1.0 / w);
+    gl_FragColor = vec4(toGamma(color), w);
+}
