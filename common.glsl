@@ -230,7 +230,7 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
     {
         //INSERT CODE HERE,
         vec3 rPos = rec.pos + rec.normal * epsilon + normalize(randomUnitVector(gSeed));
-        rScattered = createRay(rPos, normalize(rec.normal + randomUnitVector(gSeed)), rIn.t);
+        rScattered = createRay(rPos, normalize(rec.normal + randomUnitVector(gSeed)), rec.t);
         atten = rec.material.albedo * max(dot(rScattered.d, rec.normal), 0.0) / pi;
         return true;
     }
@@ -269,27 +269,24 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
         vec3 v = -rIn.d;
         vec3 vt = (outwardNormal * dot(v, outwardNormal)) - v;
         float sinI = length(vt);
-        float cosI = sqrt(1.0 - sinI * sinI);
         float sinT = niOverNt * sinI;
 
-        bool total_reflection = sinT * sinT > 1.0;
+        float total_reflection = sinT * sinT;
 
-        if (!total_reflection) {
-            float cosT = sqrt(1.0 - sinT * sinT);
-            cosine = inside ? cosT : cosI;
+        if (total_reflection <= 1.0) {
             reflectProb = schlick(cosine, rec.material.refIdx);
         } else {
             reflectProb = 1.0;
         }
 
-        if( hash1(gSeed) < reflectProb) {
+        if (hash1(gSeed) < reflectProb) {
             //Reflection
-            vec3 rOrigin = rec.pos + rec.normal * epsilon;
+            vec3 rOrigin = inside? rec.pos - rec.normal * epsilon : rec.pos - rec.normal * epsilon;
             rScattered = createRay(rOrigin, reflect(rIn.d, rec.normal), rIn.t);
             // atten *= vec3(reflectProb); not necessary since we are only scattering reflectProb rays and not all reflected rays
         } else {
             //Refraction
-            vec3 rOrigin = rec.pos - rec.normal * epsilon;
+            vec3 rOrigin = inside? rec.pos + rec.normal * epsilon : rec.pos - rec.normal * epsilon;
             rScattered = createRay(rOrigin, refract(rIn.d, outwardNormal, niOverNt), rIn.t);
             // atten *= vec3(1.0 - reflectProb); not necessary since we are only scattering 1-reflectProb rays and not all refracted rays
         }
@@ -313,47 +310,28 @@ bool hit_triangle(Triangle t, Ray r, float tmin, float tmax, out HitRecord rec)
     //INSERT YOUR CODE HERE
     vec3 AB = t.b - t.a;
     vec3 AC = t.c - t.a;
+    vec3 rOA = r.o - t.a;
 
-    vec3 normal = cross(AB, AC);
-    float denom = dot(normal, normal);
+    vec3 normal = normalize(cross(AB, AC));
+    float temp = dot(-r.o, normal) / dot(normal, r.d);
+    vec3 P = r.o + r.d * temp;
 
-    // Finding P
-    float NdotRdir = dot(normal, r.d);
+    float s1 = t.c.y - t.a.x;
+    float s2 = t.c.x - t.a.x;
+    float s3 = t.b.y - t.a.y;
+    float s4 = P.y - t.a.y;
 
-    if (abs(NdotRdir) < epsilon) return false;
+    float w1 = (t.a.x * s1 + s4 * s2 - P.x * s1) / (s3 * s2 - (t.b.x-t.a.x) * s1);
+    float w2 = (s4 - w1 * s3) / s1;
 
-    float d = - dot(normal, r.d);
-    float temp = - (dot(normal, r.o) + d) / NdotRdir;
+    if (w1 < 0.0 && w2 < 0.0 && w1 + w2 > 1.0) return false;
 
-    if (temp < 0.0) return false;
-
-    vec3 P = r.o + temp * r.d;
-    vec3 C;
-    
-    //Edge 0
-    vec3 edge0 = t.b - t.a;
-    vec3 tPA = P - t.a;
-    C = cross(edge0, tPA);
-    if (dot(normal, C) < 0.0) return false;
-
-    //Edge 1
-    vec3 edge1 = t.c - t.b;
-    vec3 tPB = P - t.b;
-    C = cross(edge1, tPB);
-    if (dot(normal, C) < 0.0) return false;
-
-    //Edge 2
-    vec3 edge2 = t.a - t.c;
-    vec3 tPC = P - t.c;
-    C = cross(edge2, tPC);
-    if (dot(normal, C) < 0.0) return false;
-    
     //calculate a valid t and normal
     if(temp < tmax && temp > tmin)
     {
         rec.t = temp;
         rec.normal = normal;
-        rec.pos = pointOnRay(r, rec.t);
+        rec.pos = r.o + r.d * temp;
         return true;
     }
 
@@ -418,6 +396,7 @@ bool hit_sphere(Sphere s, Ray r, float tmin, float tmax, out HitRecord rec)
         float t = B - tH;
         vec3 hitP = r.o + r.d * t;
         rec.normal = normalize(hitP - s.center);
+        if (s.radius < 0.0) rec.normal = -rec.normal; //inside sphere
         rec.t = t;
         rec.pos = hitP;
         return true;
@@ -440,6 +419,7 @@ bool hit_movingSphere(MovingSphere s, Ray r, float tmin, float tmax, out HitReco
         float t = B - tH;
         vec3 hitP = r.o + r.d * t;
         rec.normal = normalize(hitP - center);
+        if (s.radius < 0.0) rec.normal = -rec.normal; //inside sphere
         rec.t = t;
         rec.pos = hitP;
         return true;
