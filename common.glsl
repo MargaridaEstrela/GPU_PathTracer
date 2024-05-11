@@ -216,16 +216,14 @@ struct HitRecord
 float schlick(float cosine, float refIdx)
 {
     //INSERT YOUR CODE HERE
-    float r0 = pow((refIdx - 1.0) / (refIdx + 1.0), 2.0);
-    float x = 1.0 - cosine;
-    float ret = r0 + (1.0 - r0) * pow(x, 5.0);
+    float r0 = pow((1.0 - refIdx) / (refIdx + 1.0), 2.0);
+    float ret = r0 + (1.0 - r0) * pow(1.0 - cosine, 5.0);
 
     return ret;
 }
 
 bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
 {
-
     if(rec.material.type == MT_DIFFUSE)
     {
         //INSERT CODE HERE,
@@ -255,13 +253,14 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
             outwardNormal = -rec.normal;
             niOverNt = rec.material.refIdx;
             cosine = dot(rIn.d, rec.normal) * rec.material.refIdx;
-            atten = exp(-rec.material.refractColor * rec.t);
+            atten *= exp(-rec.material.refractColor * length(rec.pos - rIn.o));
         }
         else  //hit from outside
         {
             outwardNormal = rec.normal;
             niOverNt = 1.0 / rec.material.refIdx;
-            cosine = -dot(rIn.d, rec.normal); 
+            cosine = -dot(rIn.d, rec.normal);
+            atten *= vec3(1.0); //no absorption for outside hits
         }
 
         //Use probabilistic math to decide if scatter a reflected ray or a refracted ray
@@ -273,7 +272,7 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
 
         float total_reflection = sinT * sinT;
 
-        if (total_reflection < 1.0) {
+        if (total_reflection <= 1.0) {
             reflectProb = schlick(cosine, rec.material.refIdx);
         } else {
             reflectProb = 1.0;
@@ -281,14 +280,14 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
 
         if (hash1(gSeed) < reflectProb) {
             //Reflection
-            vec3 rOrigin = inside? rec.pos - rec.normal * epsilon : rec.pos + rec.normal * epsilon;
-            rScattered = createRay(rOrigin, reflect(rIn.d, rec.normal), rIn.t);
-            // atten *= vec3(reflectProb); not necessary since we are only scattering reflectProb rays and not all reflected rays
+            vec3 rOrigin = inside ? rec.pos - rec.normal * epsilon : rec.pos + rec.normal * epsilon;
+            rScattered = createRay(rOrigin, reflect(rIn.d, outwardNormal), rIn.t);
+            atten *= vec3(reflectProb); //not necessary since we are only scattering reflectProb rays and not all reflected rays
         } else {
             //Refraction
-            vec3 rOrigin = inside? rec.pos + rec.normal * epsilon : rec.pos - rec.normal * epsilon;
-            rScattered = createRay(rOrigin, refract(rIn.d, rec.normal, niOverNt), rIn.t);
-            // atten *= vec3(1.0 - reflectProb); not necessary since we are only scattering 1-reflectProb rays and not all refracted rays
+            vec3 rOrigin = inside ? rec.pos + rec.normal * epsilon : rec.pos - rec.normal * epsilon;
+            rScattered = createRay(rOrigin, refract(rIn.d, outwardNormal, niOverNt), rIn.t);
+            atten *= vec3(1.0 - reflectProb); //not necessary since we are only scattering 1-reflectProb rays and not all refracted rays
         }
 
         return true;
@@ -401,7 +400,7 @@ bool hit_sphere(Sphere s, Ray r, float tmin, float tmax, out HitRecord rec)
             rec.t = t;
             rec.pos = pointOnRay(r, rec.t);
             rec.normal = normalize(rec.pos - s.center);
-            //if (s.radius < 0.0) rec.normal = -rec.normal; //inside sphere
+            if(s.radius < 0.0) rec.normal *= -1.0;
             return true;
         }
 
@@ -410,7 +409,7 @@ bool hit_sphere(Sphere s, Ray r, float tmin, float tmax, out HitRecord rec)
             rec.t = t;
             rec.pos = pointOnRay(r, rec.t);
             rec.normal = normalize(rec.pos - s.center);
-            //if (s.radius < 0.0) rec.normal = -rec.normal; //inside sphere
+            if(s.radius < 0.0) rec.normal *= -1.0;
             return true;
         }
     }
