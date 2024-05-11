@@ -122,7 +122,7 @@ bool hit_world(Ray r, float tmin, float tmax, out HitRecord rec)
 vec3 directlighting(pointLight pl, Ray r, HitRecord rec) {
     vec3 diffCol, specCol;
     vec3 colorOut = vec3(0.0, 0.0, 0.0);
-    float shininess;;
+    float shininess = 500.0;
     vec3 emissive = rec.material.emissive;
     HitRecord dummy;
 
@@ -136,13 +136,6 @@ vec3 directlighting(pointLight pl, Ray r, HitRecord rec) {
     if (intensity > 0.0) {
         if (!hit_world(shadowRay, 0.0, dist, dummy))
         {
-            if (rec.material.type == MT_DIFFUSE) {
-                shininess = 4.0 / (pow(rec.material.roughness, 4.0) + epsilon) - 2.0;
-            } else if (rec.material.type == MT_METAL) {
-                shininess = 8.0 / (pow(rec.material.roughness, 4.0) + epsilon) - 2.0;
-            } else {
-                shininess = 500.0;
-            }
             // Diffuse
             diffCol = intensity * pl.color * rec.material.albedo;
 

@@ -217,7 +217,7 @@ float schlick(float cosine, float refIdx)
 {
     //INSERT YOUR CODE HERE
     float r0 = pow((1.0 - refIdx) / (refIdx + 1.0), 2.0);
-    float ret = r0 + (1.0 - r0) * pow(1.0 - cosine, 5.0);
+    float ret = r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
 
     return ret;
 }
@@ -235,8 +235,8 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
     if(rec.material.type == MT_METAL)
     {
        //INSERT CODE HERE, consider fuzzy reflections
-        vec3 fuzzyReflcetionsDir = reflect(rIn.d, rec.normal) + rec.material.roughness * randomInUnitSphere(gSeed);
-        rScattered = createRay(rec.pos + rec.normal * epsilon, normalize(fuzzyReflcetionsDir), rIn.t);
+        vec3 reflected = reflect(rIn.d, rec.normal) + rec.material.roughness * randomInUnitSphere(gSeed);
+        rScattered = createRay(rec.pos + rec.normal * epsilon, normalize(reflected), rIn.t);
         atten = rec.material.specColor;
         return true;
     }
@@ -253,7 +253,8 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
             outwardNormal = -rec.normal;
             niOverNt = rec.material.refIdx;
             cosine = dot(rIn.d, rec.normal) * rec.material.refIdx;
-            atten *= exp(-rec.material.refractColor * length(rec.pos - rIn.o));
+            float distance = length(rec.pos - rIn.o);
+            atten *= exp(-rec.material.refractColor * distance);
         }
         else  //hit from outside
         {
@@ -278,18 +279,21 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
             reflectProb = 1.0;
         }
 
+        vec3 direction, position;
+
         if (hash1(gSeed) < reflectProb) {
             //Reflection
-            vec3 rOrigin = inside ? rec.pos - rec.normal * epsilon : rec.pos + rec.normal * epsilon;
-            rScattered = createRay(rOrigin, reflect(rIn.d, outwardNormal), rIn.t);
-            atten *= vec3(reflectProb); //not necessary since we are only scattering reflectProb rays and not all reflected rays
+            position = inside ? rec.pos - rec.normal * epsilon : rec.pos + rec.normal * epsilon;
+            direction =  reflect(rIn.d, outwardNormal);
+            //atten *= vec3(reflectProb); //not necessary since we are only scattering reflectProb rays and not all reflected rays
         } else {
             //Refraction
-            vec3 rOrigin = inside ? rec.pos + rec.normal * epsilon : rec.pos - rec.normal * epsilon;
-            rScattered = createRay(rOrigin, refract(rIn.d, outwardNormal, niOverNt), rIn.t);
-            atten *= vec3(1.0 - reflectProb); //not necessary since we are only scattering 1-reflectProb rays and not all refracted rays
+            position = inside ? rec.pos + rec.normal * epsilon : rec.pos - rec.normal * epsilon;
+            direction = refract(rIn.d, outwardNormal, niOverNt);
+            //atten *= vec3(1.0 - reflectProb); //not necessary since we are only scattering 1-reflectProb rays and not all refracted rays
         }
 
+        rScattered = createRay(position, direction, rIn.t);
         return true;
     }
     return false;
