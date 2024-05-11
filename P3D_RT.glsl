@@ -12,17 +12,17 @@ bool hit_world(Ray r, float tmin, float tmax, out HitRecord rec)
     bool hit = false;
     rec.t = tmax;
 
-    // if (hit_triangle(createTriangle(vec3(-10.0, -0.01, 10.0), vec3(10.0, -0.01, 10.0), vec3(-10.0, -0.01, -10.0)), r, tmin, rec.t, rec))
-    // {
-    //     hit = true;
-    //     rec.material = createDiffuseMaterial(vec3(0.2));
-    // }
+    if (hit_triangle(createTriangle(vec3(-10.0, -0.01, 10.0), vec3(10.0, -0.01, 10.0), vec3(-10.0, -0.01, -10.0)), r, tmin, rec.t, rec))
+    {
+        hit = true;
+        rec.material = createDiffuseMaterial(vec3(0.2));
+    }
 
-    // if (hit_triangle(createTriangle(vec3(-10.0, -0.01, -10.0), vec3(10.0, -0.01, 10), vec3(10.0, -0.01, -10.0)), r, tmin, rec.t, rec))
-    // {
-    //     hit = true;
-    //     rec.material = createDiffuseMaterial(vec3(0.2));
-    // }
+    if (hit_triangle(createTriangle(vec3(-10.0, -0.01, -10.0), vec3(10.0, -0.01, 10), vec3(10.0, -0.01, -10.0)), r, tmin, rec.t, rec))
+    {
+        hit = true;
+        rec.material = createDiffuseMaterial(vec3(0.2));
+    }
 
     if (hit_sphere(createSphere(vec3(-4.0, 1.0, 0.0), 1.0), r, tmin, rec.t, rec))
     {
@@ -136,11 +136,18 @@ vec3 directlighting(pointLight pl, Ray r, HitRecord rec) {
     if (intensity > 0.0) {
         if (!hit_world(shadowRay, 0.0, dist, dummy))
         {
+            if (rec.material.type == MT_DIFFUSE) {
+                shininess = 4.0 / (pow(rec.material.roughness, 4.0) + epsilon) - 2.0;
+            } else if (rec.material.type == MT_METAL) {
+                shininess = 8.0 / (pow(rec.material.roughness, 4.0) + epsilon) - 2.0;
+            } else {
+                shininess = 500.0;
+            }
             // Diffuse
             diffCol = intensity * pl.color * rec.material.albedo;
 
             // Specular
-            vec3 h = normalize(l - r.d);
+            vec3 h = normalize(l + r.d);
             float specIntensity = pow(max(dot(h, rec.normal), 0.0), shininess);
             specCol = specIntensity * pl.color * rec.material.specColor;
 
