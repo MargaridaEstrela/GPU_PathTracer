@@ -121,7 +121,7 @@ bool hit_world(Ray r, float tmin, float tmax, out HitRecord rec)
 
 vec3 directlighting(pointLight pl, Ray r, HitRecord rec) {
     vec3 diffCol, specCol;
-    vec3 colorOut = vec3(0.0, 0.0, 0.0);
+    vec3 colorOut = vec3(0.0);
     float shininess = 500.0;
     vec3 emissive = rec.material.emissive;
     HitRecord dummy;
@@ -175,13 +175,13 @@ vec3 rayColor(Ray r)
             Ray scatterRay;
             vec3 atten;
             if (scatter(r, rec, atten, scatterRay))
-            { //  insert your code here    }
+            {
                 throughput *= atten;
                 r = scatterRay;
             }
             else //it never happens. The material always scatters the incoming ray
             {
-                return vec3(1.0, 0.0, 1.0);
+                return vec3(1.0);
             }
         }
         else //background color varying with y direction of the ray
@@ -213,8 +213,6 @@ void main()
     Camera cam = createCamera(camPos, camTarget, vec3(0.0, 1.0, 0.0), // world up vector
             fovy, iResolution.x / iResolution.y, aperture, distToFocus,
             time0, time1);
-
-    //usa-se o 4 canal de cor para guardar o numero de samples e não o iFrame pois quando se mexe o rato faz-se reset
 
     vec4 prev = texture(iChannel0, gl_FragCoord.xy / iResolution.xy);
     vec3 prevLinear = toLinear(prev.xyz);

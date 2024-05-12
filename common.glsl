@@ -215,7 +215,6 @@ struct HitRecord
 
 float schlick(float cosine, float refIdx)
 {
-    //INSERT YOUR CODE HERE
     float r0 = pow((1.0 - refIdx) / (refIdx + 1.0), 2.0);
     float ret = r0 + (1.0 - r0) * pow((1.0 - cosine), 5.0);
 
@@ -226,7 +225,6 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
 {
     if(rec.material.type == MT_DIFFUSE)
     {
-        //INSERT CODE HERE,
         vec3 rDir = rec.normal + normalize(randomUnitVector(gSeed));
         rScattered = createRay(rec.pos, rDir, rec.t);
         atten = rec.material.albedo * max(dot(rScattered.d, rec.normal), 0.0) / pi;
@@ -234,7 +232,7 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
     }
     if(rec.material.type == MT_METAL)
     {
-       //INSERT CODE HERE, consider fuzzy reflections
+       //consider fuzzy reflections
         vec3 reflected = reflect(rIn.d, rec.normal) + rec.material.roughness * randomInUnitSphere(gSeed);
         rScattered = createRay(rec.pos + rec.normal * epsilon, normalize(reflected), rIn.t);
         atten = rec.material.specColor;
@@ -253,8 +251,7 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
             outwardNormal = -rec.normal;
             niOverNt = rec.material.refIdx;
             cosine = dot(rIn.d, rec.normal) * rec.material.refIdx;
-            float distance = length(rec.pos - rIn.o);
-            atten *= exp(-rec.material.refractColor * distance);
+            atten *= exp(-rec.material.refractColor * rec.t);
         }
         else  //hit from outside
         {
@@ -310,7 +307,6 @@ Triangle createTriangle(vec3 v0, vec3 v1, vec3 v2)
 
 bool hit_triangle(Triangle t, Ray r, float tmin, float tmax, out HitRecord rec)
 {
-    //INSERT YOUR CODE HERE
     vec3 AB = t.b - t.a;
     vec3 AC = t.c - t.a;
     vec3 rOA = r.o - t.a;
@@ -388,10 +384,8 @@ vec3 center(MovingSphere mvsphere, float time)
 
 bool hit_sphere(Sphere s, Ray r, float tmin, float tmax, out HitRecord rec)
 {
-    //INSERT YOUR CODE HERE
     float sR2 = s.radius * s.radius;
     vec3 OC = s.center - r.o;
-    float A = dot(r.d, r.d);
     float B = dot(OC, r.d);
     float C2 = dot(OC, OC) - sR2;
     float discriminant = B * B - C2;
@@ -423,11 +417,9 @@ bool hit_sphere(Sphere s, Ray r, float tmin, float tmax, out HitRecord rec)
 
 bool hit_movingSphere(MovingSphere s, Ray r, float tmin, float tmax, out HitRecord rec)
 {
-    //INSERT YOUR CODE HERE
     vec3 center = center(s, r.t);
     float sR2 = s.radius * s.radius;
     vec3 OC = center - r.o;
-    float A = dot(r.d, r.d);
     float B = dot(OC, r.d);
     float C2 = dot(OC, OC) - sR2;
     float discriminant = B * B - C2;
@@ -440,6 +432,7 @@ bool hit_movingSphere(MovingSphere s, Ray r, float tmin, float tmax, out HitReco
             rec.t = t;
             rec.pos = pointOnRay(r, rec.t);
             rec.normal = normalize(rec.pos - center);
+            if(s.radius < 0.0) rec.normal *= -1.0;
             return true;
         }
 
@@ -448,6 +441,7 @@ bool hit_movingSphere(MovingSphere s, Ray r, float tmin, float tmax, out HitReco
             rec.t = t;
             rec.pos = pointOnRay(r, rec.t);
             rec.normal = normalize(rec.pos - center);
+            if(s.radius < 0.0) rec.normal *= -1.0;
             return true;
         }
     }
