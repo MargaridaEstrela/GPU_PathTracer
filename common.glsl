@@ -223,18 +223,22 @@ float schlick(float cosine, float refIdx)
 
 bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
 {
+    bool inside = dot(rIn.d, rec.normal) > 0.0;
+
     if(rec.material.type == MT_DIFFUSE)
     {
+        vec3 position = inside ? rec.pos - rec.normal * epsilon : rec.pos + rec.normal * epsilon;
         vec3 rDir = rec.normal + normalize(randomUnitVector(gSeed));
-        rScattered = createRay(rec.pos, rDir, rec.t);
+        rScattered = createRay(position, rDir, rec.t);
         atten = rec.material.albedo * max(dot(rScattered.d, rec.normal), 0.0) / pi;
         return true;
     }
     if(rec.material.type == MT_METAL)
     {
        //consider fuzzy reflections
+        vec3 position = inside ? rec.pos - rec.normal * epsilon : rec.pos + rec.normal * epsilon; 
         vec3 reflected = reflect(rIn.d, rec.normal) + rec.material.roughness * randomInUnitSphere(gSeed);
-        rScattered = createRay(rec.pos + rec.normal * epsilon, normalize(reflected), rIn.t);
+        rScattered = createRay(position, normalize(reflected), rIn.t);
         atten = rec.material.specColor;
         return true;
     }
@@ -244,7 +248,7 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
         vec3 outwardNormal;
         float niOverNt, cosine;
 
-        bool inside = dot(rIn.d, rec.normal) > 0.0;
+        
 
         if(inside) //hit inside
         {
@@ -286,11 +290,11 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
         } else {
             //Refraction
             position = inside ? rec.pos + rec.normal * epsilon : rec.pos - rec.normal * epsilon;
-            direction = refract(rIn.d, outwardNormal, niOverNt);
+            direction = refract(rIn.d, outwardNormal, niOverNt) + rec.material.roughness * randomInUnitSphere(gSeed);
             //atten *= vec3(1.0 - reflectProb); //not necessary since we are only scattering 1-reflectProb rays and not all refracted rays
         }
 
-        rScattered = createRay(position, direction, rIn.t);
+        rScattered = createRay(position, normalize(direction), rIn.t);
         return true;
     }
     return false;
