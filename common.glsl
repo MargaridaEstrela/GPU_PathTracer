@@ -394,11 +394,11 @@ bool hit_sphere(Sphere s, Ray r, float tmin, float tmax, out HitRecord rec)
     float A = dot(r.d, r.d);
     float B = dot(OC, r.d);
     float C2 = dot(OC, OC) - sR2;
-    float discriminant = B * B - A * C2;
+    float discriminant = B * B - C2;
 
     if (discriminant > 0.0) {
         float tH = sqrt(discriminant);
-        float t = (B - tH) / A;
+        float t = B - tH;
         
         if (t < tmax && t > tmin) {
             rec.t = t;
@@ -408,7 +408,7 @@ bool hit_sphere(Sphere s, Ray r, float tmin, float tmax, out HitRecord rec)
             return true;
         }
 
-        t = (B + tH) / A;
+        t = B + tH;
         if (t < tmax && t > tmin) {
             rec.t = t;
             rec.pos = pointOnRay(r, rec.t);
@@ -430,11 +430,11 @@ bool hit_movingSphere(MovingSphere s, Ray r, float tmin, float tmax, out HitReco
     float A = dot(r.d, r.d);
     float B = dot(OC, r.d);
     float C2 = dot(OC, OC) - sR2;
-    float discriminant = B * B - A * C2;
+    float discriminant = B * B - C2;
 
     if (discriminant > 0.0) {
         float tH = sqrt(discriminant);
-        float t = (B - tH) / A;
+        float t = B - tH;
         
         if (t < tmax && t > tmin) {
             rec.t = t;
@@ -443,7 +443,7 @@ bool hit_movingSphere(MovingSphere s, Ray r, float tmin, float tmax, out HitReco
             return true;
         }
 
-        t = (B + tH) / A;
+        t = B + tH;
         if (t < tmax && t > tmin) {
             rec.t = t;
             rec.pos = pointOnRay(r, rec.t);
