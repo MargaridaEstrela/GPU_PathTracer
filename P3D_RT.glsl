@@ -40,7 +40,7 @@ bool hit_world(Ray r, float tmin, float tmax, out HitRecord rec)
     if (hit_sphere(createSphere(vec3(0.0, 1.0, 0.0), 1.0), r, tmin, rec.t, rec))
     {
         hit = true;
-        rec.material = createDialectricMaterial(vec3(0.0), 1.333, 0.0);
+        rec.material = createDialectricMaterial(vec3(0.0,1.,1.), 1.333, 0.0);
     }
 
     if (hit_sphere(
@@ -207,7 +207,7 @@ void main()
     vec3 camTarget = vec3(0.0, 0.0, -1.0);
     float fovy = 60.0;
     float aperture = 5.0;
-    float distToFocus = 1.0;
+    float distToFocus = 1.5;
     float time0 = 0.0;
     float time1 = 1.0;
     Camera cam = createCamera(camPos, camTarget, vec3(0.0, 1.0, 0.0), // world up vector

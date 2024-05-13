@@ -224,7 +224,6 @@ float schlick(float cosine, float refIdx)
 bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
 {
     bool inside = dot(rIn.d, rec.normal) > 0.0;
-
     if(rec.material.type == MT_DIFFUSE)
     {
         vec3 position = inside ? rec.pos - rec.normal * epsilon : rec.pos + rec.normal * epsilon;
@@ -244,25 +243,23 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
     }
     if(rec.material.type == MT_DIALECTRIC)
     {
-        atten = vec3(1.0);
+
+        atten = vec3(1.0f);
         vec3 outwardNormal;
         float niOverNt, cosine;
 
-        
-
-        if(inside) //hit inside
+        if (inside)  // From inside
         {
             outwardNormal = -rec.normal;
             niOverNt = rec.material.refIdx;
             cosine = dot(rIn.d, rec.normal) * rec.material.refIdx;
-            atten *= exp(-rec.material.refractColor * rec.t);
+            atten = exp(-rec.material.refractColor * rec.t);  // Beer's Law
         }
-        else  //hit from outside
+        else  // From outside
         {
             outwardNormal = rec.normal;
-            niOverNt = 1.0 / rec.material.refIdx;
+            niOverNt = 1.0f / rec.material.refIdx;
             cosine = -dot(rIn.d, rec.normal);
-            atten *= vec3(1.0); //no absorption for outside hits
         }
 
         //Use probabilistic math to decide if scatter a reflected ray or a refracted ray
@@ -270,31 +267,33 @@ bool scatter(Ray rIn, HitRecord rec, out vec3 atten, out Ray rScattered)
         vec3 v = -rIn.d;
         vec3 vt = (outwardNormal * dot(v, outwardNormal)) - v;
         float sinI = length(vt);
+        float cosI = sqrt(1.0 - sinI*sinI);
         float sinT = niOverNt * sinI;
+        float cosT = sqrt(1.0 - sinT*sinT);
+        inside = dot(rIn.d, outwardNormal) > 0.0f;
 
-        float total_reflection = sinT * sinT;
-
-        if (total_reflection <= 1.0) {
+        if (sinT < 1.0) {
+            cosine = inside ? cosT : cosI;
             reflectProb = schlick(cosine, rec.material.refIdx);
         } else {
             reflectProb = 1.0;
         }
+        vec3 position, direction;
 
-        vec3 direction, position;
-
-        if (hash1(gSeed) < reflectProb) {
-            //Reflection
-            position = inside ? rec.pos - rec.normal * epsilon : rec.pos + rec.normal * epsilon;
+        if(hash1(gSeed) < reflectProb)  //Reflection
+        {
+            position =  rec.pos + outwardNormal * epsilon;
             direction =  reflect(rIn.d, outwardNormal);
-            //atten *= vec3(reflectProb); //not necessary since we are only scattering reflectProb rays and not all reflected rays
-        } else {
-            //Refraction
-            position = inside ? rec.pos + rec.normal * epsilon : rec.pos - rec.normal * epsilon;
-            direction = refract(rIn.d, outwardNormal, niOverNt) + rec.material.roughness * randomInUnitSphere(gSeed);
-            //atten *= vec3(1.0 - reflectProb); //not necessary since we are only scattering 1-reflectProb rays and not all refracted rays
+            // atten *= vec3(reflectProb); not necessary since we are only scattering reflectProb rays and not all reflected rays
         }
-
-        rScattered = createRay(position, normalize(direction), rIn.t);
+        else  //Refraction
+        {
+            position = rec.pos - outwardNormal * epsilon;
+            direction = refract(rIn.d, outwardNormal, niOverNt) + rec.material.roughness * randomInUnitSphere(gSeed);
+            // atten *= vec3(1.0 - reflectProb); not necessary since we are only scattering 1-reflectProb rays and not all refracted rays
+        }
+        
+        rScattered = createRay(position, direction, rIn.t);
         return true;
     }
     return false;
